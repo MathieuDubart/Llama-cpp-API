@@ -9,7 +9,7 @@
 
 ## Starting project
 
-- Git clone this repository inside Llama.cpp one's `git clone git@github.com:MathieuDubart/bob-ai-api.git`
+- Git clone this repository inside Llama.cpp one's `git clone git@github.com:MathieuDubart/Llama-cpp-api.git`
 - Open `server.py` and change model path to match with your model name
 - Run `python3 server.py` in root directory
 - You can now access your API routes on every linked to Tailscale device, with your hosting device's Tailscale IP (Port 5000)) (e.g: `100.x.x.x:5000/generate`)

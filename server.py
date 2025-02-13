@@ -6,7 +6,7 @@ import uuid
 app = Flask(__name__)
 
 # Load your model
-llm = Llama(model_path="./models/Llama-2-13B.Q4_K_M.gguf", n_gpu_layers=50)
+llm = Llama(model_path="./models/mistral-7b-instruct-v0.2.Q4_K_M.gguf", n_gpu_layers=50)
 
 DB_PATH = "conversations.db"
 
@@ -54,7 +54,7 @@ def new_conversation():
 
 @app.route("/generate", methods=["POST"])
 def generate():
-    """Générer une réponse en utilisant le pré-prompt et l'historique."""
+    """Générer une réponse en utilisant le pré-prompt et les deux derniers messages pour le contexte."""
     data = request.json
     conversation_id = data.get("conversation_id")
     prompt = data.get("prompt", "").strip()
@@ -64,17 +64,26 @@ def generate():
 
     with sqlite3.connect(DB_PATH) as conn:
         cursor = conn.cursor()
+
         cursor.execute("SELECT pre_prompt FROM conversations WHERE id=?", (conversation_id,))
         row = cursor.fetchone()
         pre_prompt = row[0] if row else ""
 
-    full_prompt = f"{pre_prompt}\nUser: {prompt}\nBot:"
+        cursor.execute("""
+            SELECT user, bot FROM messages 
+            WHERE conversation_id=? 
+            ORDER BY id DESC LIMIT 2
+        """, (conversation_id,))
+        last_messages = cursor.fetchall()
+
+    context = "\n".join([f"User: {msg[0]}\nBot: {msg[1]}" for msg in reversed(last_messages)])
+
+    full_prompt = f"{pre_prompt}\n{context}\nUser: {prompt}\nBot:"
 
     response = llm(full_prompt, max_tokens=3000, temperature=0.8, stop=["\nUser:", "\nBot:"])
     bot_response = response["choices"][0]["text"].strip()
 
     user_message_cleaned = prompt.replace(pre_prompt, "").strip()
-
     bot_response_cleaned = clean_response(bot_response)
 
     with sqlite3.connect(DB_PATH) as conn:
@@ -86,6 +95,8 @@ def generate():
         conn.commit()
 
     return jsonify({"response": bot_response_cleaned, "conversation_id": conversation_id})
+
+
 
 def clean_response(text):
     """Nettoyer le texte pour retirer les marqueurs 'User:' et 'Bot:'."""
